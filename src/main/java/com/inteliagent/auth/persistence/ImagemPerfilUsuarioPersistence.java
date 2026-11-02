@@ -2,7 +2,6 @@ package com.inteliagent.auth.persistence;
 
 import com.inteliagent.auth.entity.ImagemPerfilUsuario;
 import com.inteliagent.auth.entity.Usuario;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -13,9 +12,12 @@ import java.sql.SQLException;
 
 @Repository
 public class ImagemPerfilUsuarioPersistence {
+    public ImagemPerfilUsuarioPersistence(NamedParameterJdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
-    @Autowired
-    private NamedParameterJdbcTemplate jdbcTemplate;
+
+    private final NamedParameterJdbcTemplate jdbcTemplate;
 
     public int save(ImagemPerfilUsuario imagemPerfilUsuario) throws Exception{
 

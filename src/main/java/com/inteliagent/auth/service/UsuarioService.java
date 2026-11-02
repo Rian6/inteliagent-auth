@@ -6,31 +6,29 @@ import com.inteliagent.auth.entity.Usuario;
 import com.inteliagent.auth.persistence.EmailLiberacaoPersistence;
 import com.inteliagent.auth.persistence.ImagemPerfilUsuarioPersistence;
 import com.inteliagent.auth.persistence.UsuarioPersistence;
-import com.inteliagent.auth.repository.UsuarioRepository;
 import com.inteliagent.auth.util.EncodeUtil;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.Arrays;
 import java.util.Base64;
-import java.util.Random;
+import java.security.SecureRandom;
 
 @Service
 public class UsuarioService {
+    private static final byte[] DUMMY_PASSWORD = EncodeUtil.upgrade("invalid-credentials-dummy");
+    public UsuarioService(UsuarioPersistence usuarioPersistence, EmailLiberacaoPersistence emailLiberacaoPersistence, ImagemPerfilUsuarioPersistence imagemPerfilUsuarioPersistence, AuthMailOutbox mailOutbox) {
+        this.usuarioPersistence = usuarioPersistence;
+        this.emailLiberacaoPersistence = emailLiberacaoPersistence;
+        this.imagemPerfilUsuarioPersistence = imagemPerfilUsuarioPersistence;
+        this.mailOutbox = mailOutbox;
+    }
 
-    @Autowired
-    private UsuarioPersistence usuarioPersistence;
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioPersistence usuarioPersistence;
 
-    @Autowired
-    private EmailLiberacaoPersistence emailLiberacaoPersistence;
 
-    @Autowired
-    private ImagemPerfilUsuarioPersistence imagemPerfilUsuarioPersistence;
+    private final EmailLiberacaoPersistence emailLiberacaoPersistence;
+
+    private final ImagemPerfilUsuarioPersistence imagemPerfilUsuarioPersistence;
+    private final AuthMailOutbox mailOutbox;
 
     public void validarUsuario(Usuario usuario){
         usuarioPersistence.findByEmail(usuario.getEmail());
@@ -51,14 +49,17 @@ public class UsuarioService {
         Usuario usuarioBanco = usuarioPersistence.login(usuario.getEmail());
 
         if (usuarioBanco == null) {
+            EncodeUtil.matches(usuario.getSenha(), DUMMY_PASSWORD);
             return null;
         }
 
-        byte[] passwordEncrypt = EncodeUtil.encryptSHA256(usuario.getSenha());
 
-        if (!Arrays.equals(passwordEncrypt, usuarioBanco.getSecurityPassword())) {
+
+        if (!EncodeUtil.matches(usuario.getSenha(), usuarioBanco.getSecurityPassword())) {
             return null;
         }
+        if (usuarioBanco.getSituacao() != 1 || usuarioBanco.getSituacaoAprovacao() != 1) return null;
+        if (EncodeUtil.legacy(usuarioBanco.getSecurityPassword())) usuarioPersistence.updatePassword(usuarioBanco.getId(), EncodeUtil.upgrade(usuario.getSenha()));
         usuarioBanco.setSecurityPassword(null);
         usuarioBanco.setSenha(null);
 
@@ -66,62 +67,41 @@ public class UsuarioService {
     }
 
 
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public void criarUsuario(Usuario usuario) throws Exception {
+        if (usuario.getNome() == null || usuario.getNome().isBlank() || usuario.getNome().length() > 255 || usuario.getIdCede() < 1) throw new IllegalArgumentException("Dados inválidos");
+        if (!emailLiberacaoPersistence.consume(usuario.getEmail(), usuario.getCodigoEmail())) throw new IllegalArgumentException("Código inválido ou expirado");
         ImagemPerfilUsuario imagemPerfilUsuario = usuario.getImagemPerfilUsuario();
+        if (imagemPerfilUsuario != null && imagemPerfilUsuario.getImageDataBase64() != null) {
         String imageBase64 = imagemPerfilUsuario.getImageDataBase64();
+        if (imageBase64.length() > 1_400_000) throw new IllegalArgumentException("Imagem muito grande");
         byte[] imageBlob = Base64.getDecoder().decode(imageBase64);
         imagemPerfilUsuario.setImageData(imageBlob);
 
         int idImagemPerfil = imagemPerfilUsuarioPersistence.save(imagemPerfilUsuario);
         usuario.setIdImagemPerfilUsuario(idImagemPerfil);
+        }
 
-        byte[] passwordEncyper = EncodeUtil.encryptSHA256(usuario.getSenha());
+        byte[] passwordEncyper = EncodeUtil.hash(usuario.getSenha());
         usuario.setSecurityPassword(passwordEncyper);
 
         usuarioPersistence.save(usuario);
     }
 
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public void sendEmail(String email) throws Exception {
+        if (email == null || email.length() > 254 || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) throw new IllegalArgumentException("Email inválido");
         String code = generateCode();
-        String mensagem = gerarHtmlEmailValidacao();
-        mensagem = mensagem.replace("id:codigo", code);
-
         EmailLiberacao emailLiberacao = new EmailLiberacao();
         emailLiberacao.setEmail(email);
         emailLiberacao.setCodigo(code);
         emailLiberacaoPersistence.save(emailLiberacao);
 
-        usuarioRepository.sendEmail(email, "Código de Verificação", mensagem);
-    }
-
-    private String gerarHtmlEmailValidacao() {
-        String html = "";
-        html = lerArquivo("./modelos/recuperacao/index.html");
-        html = html.replace("id:nome-usuario", "teste");
-
-        return html;
-    }
-
-    private String lerArquivo(String path){
-        StringBuilder html = new StringBuilder();
-        try {
-            FileReader arq = new FileReader(path);
-            BufferedReader lerArq = new BufferedReader(arq);
-
-            String linha = "";
-            while (linha != null) {
-                linha = lerArq.readLine();
-                html.append(linha);
-            }
-            arq.close();
-        } catch (IOException e) {
-            System.err.printf("Erro na abertura do arquivo: %s.\n", e.getMessage());
-        }
-        return html.toString();
+        mailOutbox.enqueue(email,"REGISTER",code);
     }
 
     private String generateCode(){
-        Random random = new Random();
-        return String.valueOf((1000 + random.nextInt(9000)));
+        SecureRandom random = new SecureRandom();
+        return String.valueOf((100000 + random.nextInt(900000)));
     }
 }

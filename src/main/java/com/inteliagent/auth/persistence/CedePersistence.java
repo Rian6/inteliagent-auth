@@ -1,7 +1,6 @@
 package com.inteliagent.auth.persistence;
 
 import com.inteliagent.auth.entity.Usuario;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -13,9 +12,12 @@ import java.util.List;
 
 @Repository
 public class CedePersistence {
+    public CedePersistence(NamedParameterJdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
-    @Autowired
-    private NamedParameterJdbcTemplate jdbcTemplate;
+
+    private final NamedParameterJdbcTemplate jdbcTemplate;
 
     public List<Usuario> findUsuariosCede(Integer codigo) {
         String sql = "SELECT c.id FROM cede c\n" +

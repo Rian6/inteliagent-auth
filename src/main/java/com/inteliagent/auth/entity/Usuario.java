@@ -1,6 +1,19 @@
 package com.inteliagent.auth.entity;
 
 public class Usuario {
+    private String refreshToken;
+    public String getRefreshToken() { return refreshToken; }
+    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
+    private java.util.Map<String,Boolean> permissions = java.util.Map.of("createPlanning",false,"editPlanning",false,"addVisits",false,"reorderVisits",false);
+    public java.util.Map<String,Boolean> getPermissions() { return permissions; }
+    public void setPermissions(java.util.Map<String,Boolean> value) { permissions=value; }
+    private String role = "AGENT";
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
+    private int tokenVersion;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public int getTokenVersion() { return tokenVersion; }
+    public void setTokenVersion(int value) { tokenVersion = value; }
     private int id;
     private String nome;
     private String email;
@@ -38,6 +51,7 @@ public class Usuario {
         this.email = email;
     }
 
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
     public String getSenha() {
         return senha;
     }
@@ -62,6 +76,7 @@ public class Usuario {
         this.situacaoAprovacao = situacaoAprovacao;
     }
 
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
     public String getCodigoEmail() {
         return codigoEmail;
     }
@@ -102,6 +117,7 @@ public class Usuario {
         this.token = token;
     }
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     public byte[] getSecurityPassword() {
         return securityPassword;
     }

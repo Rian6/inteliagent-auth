@@ -1,7 +1,7 @@
 package com.inteliagent.auth.controller.socket;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.ObjectMapper;
 import com.inteliagent.auth.dto.auth.Solicitacao;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
